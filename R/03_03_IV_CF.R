@@ -32,10 +32,6 @@ pop_2000 <- ACS_pop %>%
   )
 
 
-####### get rid of outliers 
-data <- data %>%
-  filter(wage > 5) %>%
-  filter(wage < 500)
 
 ######################################################################################################################################################################
 ## 1. Control function estimation following Imbens & Newey 2009 
@@ -69,11 +65,58 @@ shocks <- estimate_cf_distribution(
 )
 
 # check estimated V 
-hist(shocks$V_hat, breaks = 30)
-plot(
-  shocks$d_tradeusch_p1_2000_2012,
-  shocks$V_hat
+V_hat_hist <- ggplot(data.frame(V_hat = shocks$V_hat), aes(V_hat)) +
+  geom_histogram(binwidth = 0.05, color = "black", fill = "grey80") +
+  theme_minimal()
+ggsave(
+  filename = "plots/descriptive_statistics/V_hat_hist.png",
+  plot = V_hat_hist,
+  width = 8,
+  height = 5,
+  dpi = 300,
+  bg = "white"
 )
+
+formula_first_stage_IV_2 <- d_tradeusch_p1_2000_2012 ~ d_tradeotch_p1_lag_2000_2012 + l_shind_manuf_cbp + l_sh_popedu_c + l_sh_popfborn + l_sh_empl_f + l_sh_routine33 + l_task_outsource + region +  sh_65up_all + sh_4064_all + sh_0017_all + sh_00up_nw
+
+# run first stage IV
+first_stage <- lm(formula_first_stage_IV_2, data = shocks)
+cor(
+  shocks$V_hat,
+  first_stage$residuals
+)
+plot(
+  shocks$V_hat,
+  first_stage$residuals,
+  pch = 19,
+  cex = 0.6,
+  xlab = "First-stage residual",
+  ylab = "Estimated control function"
+)
+formula_cf <- update(
+  formula_first_stage_IV_2,
+  . ~ . + V_hat
+)
+m2 <- lm(formula_cf,
+  data = shocks
+)
+summary(first_stage)
+summary(m2)
+m2_clean <- lm(formula(m2), data = model.frame(m2))
+
+stargazer(
+  m2_clean,
+  type = "latex",
+  out = "plots/descriptive_statistics/first_stage_IV_CF.tex",
+  title = "First-Stage Regression with Control Function",
+  keep = c("d_tradeotch_p1_lag_2000_2012", "V_hat"),
+  digits = 3,
+  star.cutoffs = c(0.10, 0.05, 0.01),
+  omit.stat = c("f", "ser"),
+  dep.var.labels = c("d\\_tradeusch\\_p1\\_2000\\_2012")
+)
+
+
 #################################################################
 ## QoQ-control-function-IV appraoch for every year (2005–2019)
 #################################################################

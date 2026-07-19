@@ -6,6 +6,7 @@ library(plotly)
 #install.packages("remotes")
 #remotes::install_github("yuchang0321/IVQR")
 library(IVQR)
+library(webshot2)
 
 
 
@@ -739,4 +740,71 @@ qq_second_stage_chetverikov <- function(fitted_first, X, taus, weights = NULL) {
     fitted = fitted_mat,
     residuals = resid_mat
   )
+}
+
+############################
+# Make tables for the bootstrap
+##################################
+make_bootstrap_table <- function(coef_hat, se_hat, ci_low, ci_high, file) {
+  
+  # Escape LaTeX special characters in names
+  latex_escape <- function(x) {
+    x <- gsub("\\\\", "\\\\textbackslash{}", x)
+    x <- gsub("([_&#%$])", "\\\\\\1", x)
+    x <- gsub("\\{", "\\\\{", x)
+    x <- gsub("\\}", "\\\\}", x)
+    return(x)
+  }
+  
+  sig <- (ci_low > 0) | (ci_high < 0)
+  stars <- ifelse(sig, "**", "")
+  
+  con <- file(file, "w")
+  
+  cat("\\setlength{\\tabcolsep}{3pt}\n", file = con)
+  cat("\\resizebox{\\textwidth}{!}{%\n", file = con)
+  
+  cat("\\begin{tabular}{l", file = con)
+  cat(paste(rep("c", ncol(coef_hat)), collapse = ""), file = con)
+  cat("}\n", file = con)
+  
+  cat("\\toprule\n", file = con)
+  
+  # Column headers (no math mode)
+  headers <- latex_escape(colnames(coef_hat))
+  cat(paste(c("", headers), collapse = " & "), file = con)
+  cat(" \\\\\n", file = con)
+  
+  cat("\\midrule\n", file = con)
+  
+  for(i in seq_len(nrow(coef_hat))){
+    
+    est <- sprintf("%.3f%s",
+                   coef_hat[i,],
+                   stars[i,])
+    
+    # stack ci_low on top of ci_high inside brackets, in a single cell
+    ci <- sprintf("\\shortstack{[%.3f\\\\%.3f]}",
+                  ci_low[i,],
+                  ci_high[i,])
+    
+    # Row header (no math mode)
+    cat(latex_escape(rownames(coef_hat)[i]),
+        "&",
+        paste(est, collapse = " & "),
+        "\\\\\n",
+        file = con)
+    
+    cat("",
+        "&",
+        paste(ci, collapse = " & "),
+        "\\\\[0.25em]\n",
+        file = con)
+  }
+  
+  cat("\\bottomrule\n", file = con)
+  cat("\\end{tabular}\n", file = con)
+  cat("}\n", file = con)  # close resizebox
+  
+  close(con)
 }

@@ -23,20 +23,14 @@ controls <- read_dta("data/ADH_control_vars.dta")
 data <- readRDS("data/data.rds")
 ACS_pop <- read_dta("data/ACS_pop_emp_inc.dta")
 
-####### get rid of outliers, select important variables
+# select important variables
 data <- data %>%
   select(czone, wage, lnwage, pweight, STATEFIP)
 
-data <- data %>%
-  filter(wage > 5) %>%
-  filter(wage < 500) %>%
-  filter(!is.na(pweight))
+# set seed
+set.seed(1234)
 
-# get rid of too many cz (Autor et al. 2021 just look at Mainland US CZs)
 valid_cz <- unique(shocks$czone)
-
-data <- data %>%
-  filter(czone %in% valid_cz)
 
 # controls for 1990
 controls_1990 <- controls %>%
@@ -180,7 +174,7 @@ bootstrap_qoq_iv_CH <- function(data, shocks) {
 
 states <- unique(shocks$statefip)
 
-B <- 3 # increase later (500–1000 in production)
+B <- 100 # increase later (500–1000 in production)
 
 
 bootstrap_results <- array(
@@ -218,6 +212,10 @@ for (b in 1:B) {
   cat("Bootstrap", b, "done\n")
 }
 
+saveRDS(
+  bootstrap_results,
+  file = "plots/iv_qoq/IVQR_approach/bootstrap_data_IVQR.rds"
+)
 
 
 B <- dim(bootstrap_results)[1]
@@ -306,3 +304,75 @@ stargazer::stargazer(
   type = "latex",
   out = "plots/iv_qoq/IVQR_approach/bootstrap_results_IVQR.tex"
 )
+
+
+#################################################################
+## QoQ-IVQR-IV approach: full-sample point estimates (no bootstrap)
+#################################################################
+
+# -------------------------------------------------------
+# 1. QQ first stage (full sample)
+# -------------------------------------------------------
+qq_first_full <- qq_first_stage_collapsed(
+  y = data$lnwage,
+  group_vec = data$czone,
+  taus = taus,
+  pweights = data$pweight
+)
+
+cz_full <- qq_first_full$group_order
+
+X_df_full <- shocks %>%
+  left_join(pop_2000, by = "czone") %>%
+  filter(czone %in% cz_full) %>%
+  mutate(
+    czone = factor(
+      czone,
+      levels = cz_full
+    )
+  ) %>%
+  arrange(czone)
+
+# align shocks
+X_full <- model.matrix(
+  ~ l_shind_manuf_cbp +
+    l_sh_popedu_c +
+    l_sh_popfborn +
+    l_sh_empl_f +
+    l_sh_routine33 +
+    l_task_outsource +
+    region +
+    sh_65up_all +
+    sh_4064_all +
+    sh_0017_all +
+    sh_00up_nw - 1,
+  data = X_df_full
+)
+
+D_full <- X_df_full$d_tradeusch_p1_2000_2012
+Z_full <- X_df_full$d_tradeotch_p1_lag_2000_2012
+
+# -------------------------------------------------------
+# 2. Second stage (full sample)
+# -------------------------------------------------------
+coeffs_full <- qq_second_stage_ivqr_group(
+  fitted_first = qq_first_full$fitted,
+  D = D_full,
+  Z = Z_full,
+  X = X_full,
+  taus = taus,
+  grid = grid
+)
+
+point_estimates_IVQR <- coeffs_full$beta_D
+
+dimnames(point_estimates_IVQR) <- list(
+  paste0("u_", taus),
+  paste0("v_", taus)
+)
+
+saveRDS(
+  point_estimates_IVQR,
+  file = "plots/iv_qoq/IVQR_approach/point_estimates_IVQR.rds"
+)
+

@@ -18,20 +18,16 @@ controls <- read_dta("data/ADH_control_vars.dta")
 data <- readRDS("data/data.rds")
 ACS_pop <- read_dta("data/ACS_pop_emp_inc.dta")
 
-####### get rid of outliers, select important variables
+# select important variables
 data <- data %>%
   select(czone, wage, lnwage, pweight, STATEFIP)
 
-data <- data %>%
-  filter(wage > 5) %>%
-  filter(wage < 500) %>%
-  filter(!is.na(pweight))
+# set seed
+set.seed(1234)
 
 # get rid of too many cz (Autor et al. 2021 just look at Mainland US CZs)
 valid_cz <- unique(shocks$czone)
 
-data <- data %>%
-  filter(czone %in% valid_cz)
 
 # controls for 1990
 controls_1990 <- controls %>%
@@ -181,7 +177,7 @@ bootstrap_qoq_iv_linear <- function(data, shocks) {
 
 states <- unique(shocks$statefip)
 
-B <- 3 # increase later (500–1000 in production)
+B <- 100
 
 
 bootstrap_results <- array(
@@ -218,91 +214,90 @@ for (b in 1:B) {
   cat("Bootstrap", b, "done\n")
 }
 
-
-
-B <- dim(bootstrap_results)[1]
-U <- dim(bootstrap_results)[2]
-V <- dim(bootstrap_results)[3]
-
-coef_hat <- apply(bootstrap_results, c(2, 3), mean, na.rm = TRUE)
-se_hat <- apply(bootstrap_results, c(2, 3), sd, na.rm = TRUE)
-ci_low <- apply(bootstrap_results, c(2, 3), quantile, probs = 0.025, na.rm = TRUE)
-ci_high <- apply(bootstrap_results, c(2, 3), quantile, probs = 0.975, na.rm = TRUE)
-
-result <- list(
-  coef = coef_hat,
-  se   = se_hat,
-  ci_low = ci_low,
-  ci_high = ci_high
+saveRDS(
+  bootstrap_results,
+  file = "plots/iv_qoq/linear_approach/bootstrap_data_linear.rds"
 )
 
-boot_surface <- plot_qq_surface(
-  coef_hat,
+
+#################################################################
+## QoQ-linear-IV approach: full-sample point estimates (no bootstrap)
+#################################################################
+
+# -------------------------------------------------------
+# 1. First stage IV (full sample, no resampling)
+# -------------------------------------------------------
+shocks_full <- shocks %>%
+  left_join(pop_2000, by = "czone")
+
+first_stage_full <- lm(formula_first_stage_IV_2, data = shocks_full)
+
+shocks_full$IV_d_tradeusch_p1_2000_2012 <- predict(first_stage_full, newdata = shocks_full)
+
+# -------------------------------------------------------
+# 2. QQ first stage (full sample)
+# -------------------------------------------------------
+qq_first_full <- qq_first_stage_collapsed(
+  y = data$lnwage,
+  group_vec = data$czone,
   taus = taus,
-  tplot = 1,
-  mycolors = "",
-  z_label = "Shock Impact",
-  group = "CZ",
-  zlim = z_min_max
+  pweights = data$pweight
 )
 
+cz_full <- qq_first_full$group_order
 
-htmlwidgets::saveWidget(
-  boot_surface,
-  file = "plots/iv_qoq/linear_approach/surface_boot_linear.html",
-  selfcontained = TRUE
+# align shocks
+X_df_full <- shocks_full %>%
+  filter(czone %in% cz_full) %>%
+  mutate(
+    czone = factor(
+      czone,
+      levels = cz_full
+    )
+  ) %>%
+  arrange(czone)
+
+X_full <- model.matrix(
+  ~ IV_d_tradeusch_p1_2000_2012 +
+    l_shind_manuf_cbp +
+    l_sh_popedu_c +
+    l_sh_popfborn +
+    l_sh_empl_f +
+    l_sh_routine33 +
+    l_task_outsource +
+    region +
+    sh_65up_all +
+    sh_4064_all +
+    sh_0017_all +
+    sh_00up_nw,
+  data = X_df_full
 )
 
+pop_w_full <- X_df_full$pop_share_2000
 
-boot_slices <- plot_qq_slices(
-  coef_hat,
+# -------------------------------------------------------
+# 3. Second stage (full sample)
+# -------------------------------------------------------
+coeffs_full <- qq_second_stage_group(
+  fitted_first = qq_first_full$fitted,
+  X = X_full,
   taus = taus,
-  z_label = "Shock Impact",
-  group = "CZ",
-  ylim = y_min_max
-) +
-  ggtitle("China Shock Impact - Bootstrapped")
-
-# save png
-ggsave(
-  filename = "plots/iv_qoq/linear_approach/slices_boot_linear.png",
-  plot = boot_slices,
-  width = 8,
-  height = 5,
-  dpi = 300,
-  bg = "white"
+  weights = pop_w_full
 )
 
-# significance matrix
-sig <- (ci_low > 0) | (ci_high < 0)
-stars <- ifelse(sig, "**", "")
-coef_star <- matrix(
-  paste0(round(coef_hat, 3), stars),
-  nrow = nrow(coef_hat),
-  ncol = ncol(coef_hat),
-  dimnames = dimnames(coef_hat)
+coefficients_full <- coeffs_full$coef
+
+point_estimates_linear <- coefficients_full[
+  "IV_d_tradeusch_p1_2000_2012",
+  ,
+]
+
+dimnames(point_estimates_linear) <- list(
+  paste0("u_", taus),
+  paste0("v_", taus)
 )
 
-se_formatted <- matrix(
-  paste0("(", sprintf("%.3f", se_hat), ")"),
-  nrow = nrow(se_hat)
-)
-
-final_table <- matrix("", 
-                      nrow = nrow(coef_hat) * 2,
-                      ncol = ncol(coef_hat),
-                      dimnames = list(
-                        rep(rownames(coef_hat), each = 2),
-                        colnames(coef_hat)
-                      ))
-
-final_table[seq(1, nrow(final_table), by = 2), ] <- coef_star
-final_table[seq(2, nrow(final_table), by = 2), ] <- se_formatted
-
-stargazer::stargazer(
-  as.data.frame(final_table),
-  summary = FALSE,
-  rownames = TRUE,
-  type = "latex",
-  out = "plots/iv_qoq/linear_approach/bootstrap_results_linear.tex"
+saveRDS(
+  point_estimates_linear,
+  file = "plots/iv_qoq/linear_approach/point_estimates_linear.rds"
 )

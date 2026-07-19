@@ -129,7 +129,7 @@ bootstrap_qoq_iv_CF <- function(data, shocks) {
     z_var = "d_tradeotch_p1_lag_2000_2012",
     control_vars = control_vars
   )
-
+  
   # -------------------------------------------------------
   # 3. QQ first stage
   # -------------------------------------------------------
@@ -177,8 +177,7 @@ bootstrap_qoq_iv_CF <- function(data, shocks) {
   coeffs <- qq_second_stage_group(
     fitted_first = qq_first$fitted,
     X = X,
-    taus = taus,
-    weights = pop_w
+    taus = taus
   )
   coefficients <- coeffs$coef
   
@@ -238,7 +237,7 @@ t <- t1 - t0
 
 saveRDS(
   bootstrap_results,
-  file = "plots/iv_qoq/control_function_approach/bootstrap_data_CF.rds"
+  file = "plots/iv_qoq/control_function_approach/bootstrap_data_CF_unweighted.rds"
 )
 
 
@@ -307,8 +306,7 @@ pop_w_full <- X_df_full$pop_share_2000
 coeffs_full <- qq_second_stage_group(
   fitted_first = qq_first_full$fitted,
   X = X_full,
-  taus = taus,
-  weights = pop_w_full
+  taus = taus
 )
 
 coefficients_full <- coeffs_full$coef
@@ -325,5 +323,6 @@ dimnames(point_estimates_CF) <- list(
 
 saveRDS(
   point_estimates_CF,
-  file = "plots/iv_qoq/control_function_approach/point_estimates_CF.rds"
+  file = "plots/iv_qoq/control_function_approach/point_estimates_CF_unweighted.rds"
 )
+

@@ -15,7 +15,7 @@ source("R/00_2_functions.R")
 
 shocks <- read_dta("data/czone_exposure_by_period_v5_gh.dta")
 controls <- read_dta("data/ADH_control_vars.dta")
-data <- readRDS("data/data.rds")
+data <- readRDS("data/data_robust.rds")
 ACS_pop <- read_dta("data/ACS_pop_emp_inc.dta")
 
 # select important variables
@@ -129,7 +129,7 @@ bootstrap_qoq_iv_CF <- function(data, shocks) {
     z_var = "d_tradeotch_p1_lag_2000_2012",
     control_vars = control_vars
   )
-
+  
   # -------------------------------------------------------
   # 3. QQ first stage
   # -------------------------------------------------------
@@ -238,9 +238,8 @@ t <- t1 - t0
 
 saveRDS(
   bootstrap_results,
-  file = "plots/iv_qoq/control_function_approach/bootstrap_data_CF.rds"
+  file = "plots/iv_qoq/control_function_approach/bootstrap_data_CF_robust.rds"
 )
-
 
 #################################################################
 ## QoQ-CF-IV approach: full-sample point estimates (no bootstrap)
@@ -325,5 +324,5 @@ dimnames(point_estimates_CF) <- list(
 
 saveRDS(
   point_estimates_CF,
-  file = "plots/iv_qoq/control_function_approach/point_estimates_CF.rds"
+  file = "plots/iv_qoq/control_function_approach/point_estimates_CF_robust.rds"
 )

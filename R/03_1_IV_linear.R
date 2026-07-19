@@ -10,6 +10,7 @@ library(qqreg)
 library(quantreg)
 library(car)
 library(ivreg)
+library(stargazer)
 #load quantile on quantiles functions
 source("R/00_2_functions.R")
 
@@ -34,8 +35,6 @@ pop_2000 <- ACS_pop %>%
 
 ####### get rid of outliers 
 data <- data %>%
-  filter(wage > 5) %>%
-  filter(wage < 500) %>%
   filter(!is.na(pweight))
 
 # get rid of too many cz
@@ -65,7 +64,22 @@ shocks$IV_d_tradeusch_p1_2000_2012 <- predict(first_stage)
 #evaluate Instrument: 
 #F test
 f_value <- linearHypothesis(first_stage, "d_tradeotch_p1_lag_2000_2012 = 0")
-f_value$F
+F_test <- f_value$F[2]
+
+# Stargazer table
+stargazer(
+  first_stage,
+  type = "latex",
+  out = "plots/descriptive_statistics/first_stage_IV.tex",
+  title = "First-Stage Regression",
+  keep = "d_tradeotch_p1_lag_2000_2012",
+  digits = 3,
+  star.cutoffs = c(0.10, 0.05, 0.01),
+  omit.stat = c("f", "ser"),
+  add.lines = list(
+    c("Excluded instrument F-statistic", round(F_test, 2))
+  )
+)
 
 #Is linear approach correct? scatter plot 
 ggplot(shocks,

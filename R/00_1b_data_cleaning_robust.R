@@ -148,7 +148,7 @@ data <- data %>%
 data <- data %>%
   mutate(
     naics_sector = as.factor(naics_sector),
-    )
+  )
 
 
 ##race variable #################
@@ -192,43 +192,13 @@ n3 <- nrow(data3)
 rm(data, data1)
 rm(data_05_11, data_12_19)
 
+wage_cutoffs <- quantile(data3$wage, probs = c(0.01, 0.99), na.rm = TRUE)
+
 data4 <- data3 %>%
-  filter(wage > 5) %>%
-  filter(wage < 500)%>%
+  filter(wage > wage_cutoffs[1]) %>%
+  filter(wage < wage_cutoffs[2]) %>%
   filter(!is.na(pweight))
 n4 <- nrow(data4)
 
-n_unique <- data4 %>%
-  distinct(YEAR, STATEFIP, COUNTYFIP, PERWT, INCWAGE_CPIU_2010, UHRSWORK) %>%
-  nrow()
 
-drop_summary <- data.frame(
-  `Data Step` = c(
-    "Working-age population (18--64)",
-    "Drop: missing commuting zone",
-    "Drop: missing or zero wage",
-    "Drop: wage outliers (\\$5 \\> wage \\> \\$500)", 
-    "Final sample (with CZ expansion)",
-    "Final sample (unique individuals)"
-  ),
-  `Observations` = c(n0, n1, n3, n4, n4, n_unique),
-  `Dropped (step)` = c(NA, n0 - n1, n1 - n3, n3 - n4, NA, NA),
-  `Dropped (total)` = c(NA, n0 - n1, n0 - n3, n0 - n4, NA, NA),
-  check.names = FALSE
-)
-
-print(
-  xtable(
-    drop_summary,
-    caption = "Sample Construction",
-    label = "tab:drop_summary",
-    digits = 0
-  ),
-  include.rownames = FALSE,
-  sanitize.text.function = identity,
-  format.args = list(big.mark = ","),
-  booktabs = TRUE,
-  file = "plots/descriptive_statistics/drop_summary.tex"
-)
-
-saveRDS(data4, "data/data.rds")
+saveRDS(data4, "data/data_robust.rds")

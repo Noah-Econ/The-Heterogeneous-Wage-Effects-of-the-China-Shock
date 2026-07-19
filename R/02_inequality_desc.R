@@ -18,11 +18,6 @@ source("R/00_2_functions.R")
 cz_geo <- st_read("data/cz_geo.shp")
 data <- readRDS("data/data.rds")
 
-# 0.0 Exclude Outliers
-data <- data %>%
-  filter(wage > 7.25) %>%
-  filter(wage < 500)
-
 ######################################################################################################################################################################
 ## 1. Between Group Inequality (Median Wage)
 ######################################################################################################################################################################
@@ -161,6 +156,7 @@ ggsave(
   dpi = 300
 )
 
+
 # 1.4 animated map median wage 
 median_wage_cz <- data %>%
   filter(YEAR >= 2005, YEAR <= 2019) %>%
@@ -190,7 +186,7 @@ pmap_med_wage_anim <- tm_shape(pmap_med_wage) +
     palette = "plasma",
     style = "cont",
     limits = wage_limits,
-    title = "Weighted Median Wage"
+    title = "Median Wage"
   ) +
   tm_facets_pagewise(
     by = "YEAR",
@@ -209,6 +205,29 @@ tmap_animation(
   height = 800,
   delay = 120
 )
+
+# 2005 and 2019 median wage maps
+
+pmap_med_wage_0519 <- pmap_med_wage %>% filter(YEAR %in% c(2005, 2019))
+
+med_wage_map_0519 <- tm_shape(pmap_med_wage_0519) +
+  tm_polygons(
+    col = "median_wage",
+    palette = "plasma",
+    style = "cont",
+    limits = wage_limits,
+    title = "Median Wage"
+  ) +
+  tm_facets_wrap(
+    by = "YEAR",
+    labeller = function(x) paste("Year", x)
+  ) +
+  tm_layout(
+    frame = FALSE,
+    legend.outside = TRUE
+  )
+
+tmap_save(med_wage_map_0519, "plots/evolution_wage_inequality/between/median_wage_cz_2005_2019.png", width = 12, height = 6, units = "in", dpi = 300)
 
 # 1.5 richest and poorest CZ by median wage
 cz_rank <- pmap_med_wage %>%
@@ -389,10 +408,10 @@ tmap_animation(
 )
 
 # 2008 and 2019 to show in thesis
-pmap_gini_2008 <- pmap_gini_wage %>% filter(YEAR == 2008)
-pmap_gini_2019 <- pmap_gini_wage %>% filter(YEAR == 2019)
+# 2008 and 2019 Gini map to show in thesis
+pmap_gini_0819 <- pmap_gini_wage %>% filter(YEAR %in% c(2008, 2019))
 
-gini_map_2008 <- tm_shape(pmap_gini_2008) +
+gini_map_0819 <- tm_shape(pmap_gini_0819) +
   tm_polygons(
     col = "gini",
     palette = "plasma",
@@ -400,32 +419,16 @@ gini_map_2008 <- tm_shape(pmap_gini_2008) +
     limits = wage_limits,
     title = "Weighted Gini"
   ) +
-  tm_layout(
-    title = "Year 2008",
-    title.size = 1,
-    title.position = c("center", "top"),
-    frame = FALSE,
-    legend.outside = TRUE
-  )
-
-gini_map_2019 <- tm_shape(pmap_gini_2019) +
-  tm_polygons(
-    col = "gini",
-    palette = "plasma",
-    style = "cont",
-    limits = wage_limits,
-    title = "Weighted Gini"
+  tm_facets_wrap(
+    by = "YEAR",
+    labeller = function(x) paste("Year", x)
   ) +
   tm_layout(
-    title = "Year 2019",
-    title.size = 1,
-    title.position = c("center", "top"),
     frame = FALSE,
     legend.outside = TRUE
   )
 
-tmap_save(gini_map_2008, "plots/evolution_wage_inequality/within/gini_wage_cz_2008.png", width = 8, height = 6, units = "in", dpi = 300)
-tmap_save(gini_map_2019, "plots/evolution_wage_inequality/within/gini_wage_cz_2019.png", width = 8, height = 6, units = "in", dpi = 300)
+tmap_save(gini_map_0819, "plots/evolution_wage_inequality/within/gini_wage_cz_2008_2019.png", width = 12, height = 6, units = "in", dpi = 300)
 #2.2.2 p9010 over time over regions
 
 p9010_wage_cz <- data %>%

@@ -22,10 +22,6 @@ controls <- read_dta("data/ADH_control_vars.dta")
 data <- readRDS("data/data.rds")
 ACS_pop <- read_dta("data/ACS_pop_emp_inc.dta")
 
-####### get rid of outliers 
-data <- data %>%
-  filter(wage > 5) %>%
-  filter(wage < 500)
 
 
 ######################################################################################################################################################################
